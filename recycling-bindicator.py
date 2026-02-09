@@ -1,0 +1,148 @@
+from microbit import *
+import utime
+import math
+
+# LED pins
+GREEN = pin0  # Regular bin (every Thursday)
+YELLOW = pin1  # Recycle bin (every other Thursday)
+
+# Day constants
+WEDNESDAY = 2
+THURSDAY = 3
+DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
+
+def configure_day():
+    """Let user pick current day of week using buttons.
+    Button A = cycle to next day, Button B = confirm selection.
+    Returns 0=Mon .. 6=Sun.
+    """
+    display.scroll("DAY?")
+    day = 0
+
+    while True:
+        display.scroll(DAY_NAMES[day])
+
+        while True:
+            a = button_a.is_pressed()
+            b = button_b.is_pressed()
+
+            if a:
+                day = (day + 1) % 7
+                sleep(300)
+                break
+            if b:
+                sleep(500)
+                return day
+
+            sleep(50)
+
+
+def configure_recycle():
+    """Ask if next bin day is a recycle day.
+    Button A = toggle Y/N, Button B = confirm selection.
+    Returns bool.
+    """
+    display.scroll("REC?")
+    choice = True
+
+    while True:
+        display.show("Y" if choice else "N")
+
+        while True:
+            a = button_a.is_pressed()
+            b = button_b.is_pressed()
+
+            if a:
+                choice = not choice
+                sleep(300)
+                break
+            if b:
+                sleep(500)
+                return choice
+
+            sleep(50)
+
+
+def leds_off():
+    GREEN.write_digital(0)
+    YELLOW.write_digital(0)
+
+
+def pulse_value(t):
+    """Return 0-1023 analog value for a breathing effect.
+    t is time in ms, full cycle ~3 seconds.
+    """
+    angle = (t % 3000) / 3000.0 * 2 * math.pi
+    val = (math.sin(angle - math.pi / 2) + 1) / 2
+    return int(val * 1023)
+
+
+def handle_shake(next_is_recycle):
+    """On shake: green on solid, flash yellow 5x if next is recycle."""
+    GREEN.write_digital(1)
+
+    if next_is_recycle:
+        for _ in range(5):
+            YELLOW.write_digital(1)
+            sleep(200)
+            YELLOW.write_digital(0)
+            sleep(200)
+    else:
+        sleep(2000)
+
+    GREEN.write_digital(0)
+
+
+# --- Startup ---
+leds_off()
+display.show(Image.HEART)
+sleep(1000)
+
+current_day = configure_day()
+next_is_recycle = configure_recycle()
+
+display.clear()
+
+# Track time for day rollover
+last_day_change = utime.ticks_ms()
+
+# --- Main loop ---
+while True:
+    # Day rollover check
+    now = utime.ticks_ms()
+    elapsed = utime.ticks_diff(now, last_day_change)
+    if elapsed >= 86400000:  # 24 hours in ms
+        last_day_change = utime.ticks_add(last_day_change, 86400000)
+        old_day = current_day
+        current_day = (current_day + 1) % 7
+        # Toggle recycle flag when rolling past Thursday
+        if old_day == THURSDAY:
+            next_is_recycle = not next_is_recycle
+
+    # Shake detection
+    if accelerometer.was_gesture("shake"):
+        handle_shake(next_is_recycle)
+        continue
+
+    # LED behavior based on current day
+    if current_day == THURSDAY:
+        GREEN.write_digital(1)
+        if next_is_recycle:
+            YELLOW.write_digital(1)
+        else:
+            YELLOW.write_digital(0)
+        sleep(100)
+
+    elif current_day == WEDNESDAY:
+        pv = pulse_value(utime.ticks_ms())
+        GREEN.write_analog(pv)
+        if next_is_recycle:
+            YELLOW.write_analog(pv)
+        else:
+            YELLOW.write_digital(0)
+        sleep(20)
+
+    else:
+        leds_off()
+        sleep(100)
