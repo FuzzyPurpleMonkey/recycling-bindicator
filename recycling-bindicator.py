@@ -78,6 +78,15 @@ def pulse_value(t):
     return int(val * 1023)
 
 
+def flash_led(pin, times=3):
+    """Flash a single LED pin a given number of times."""
+    for _ in range(times):
+        pin.write_digital(1)
+        sleep(200)
+        pin.write_digital(0)
+        sleep(200)
+
+
 def handle_shake(next_is_recycle):
     """On shake: green on solid, flash yellow 5x if next is recycle."""
     GREEN.write_digital(1)
@@ -120,25 +129,25 @@ while True:
         if old_day == THURSDAY:
             next_is_recycle = not next_is_recycle
 
+    # Button presses
+    if button_a.was_pressed():
+        flash_led(YELLOW)
+        continue
+    if button_b.was_pressed():
+        flash_led(GREEN)
+        continue
+
     # Shake detection
     if accelerometer.was_gesture("shake"):
         handle_shake(next_is_recycle)
         continue
 
     # LED behavior based on current day
-    if current_day == THURSDAY:
-        GREEN.write_digital(1)
-        if next_is_recycle:
-            YELLOW.write_digital(1)
-        else:
-            YELLOW.write_digital(0)
-        sleep(100)
-
-    elif current_day == WEDNESDAY:
+    if current_day in (WEDNESDAY, THURSDAY):
         pv = pulse_value(utime.ticks_ms())
         GREEN.write_analog(pv)
         if next_is_recycle:
-            YELLOW.write_analog(pv)
+            YELLOW.write_analog(min(int(pv * 1.5), 1023))
         else:
             YELLOW.write_digital(0)
         sleep(20)

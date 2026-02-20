@@ -27,12 +27,11 @@ On boot the micro:bit displays a heart, then walks you through two setup prompts
 
 | Day       | Green LED          | Yellow LED (if recycling week) |
 |-----------|--------------------|--------------------------------|
-| Thursday  | Solid on           | Solid on                       |
+| Thursday  | Breathing/pulsing  | Breathing/pulsing              |
 | Wednesday | Breathing/pulsing  | Breathing/pulsing              |
 | All other | Off                | Off                            |
 
-- On **Thursday** (bin day), LEDs stay solid to remind you that today is collection day.
-- On **Wednesday** (night before), LEDs pulse with a breathing effect as an advance reminder.
+- On **Thursday** (bin day) and **Wednesday** (night before), LEDs pulse with a breathing effect as a reminder.
 - On all other days, LEDs are off.
 
 If it is not a recycling week, only the green LED activates on Wednesday/Thursday.
