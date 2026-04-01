@@ -144,7 +144,7 @@ saved = None if force_reconfigure else load_state()
 
 if saved is not None:
     current_day, next_is_recycle = saved
-    display.scroll("OK")
+    display.scroll("OK " + DAY_NAMES[current_day] + " " + ("REC" if next_is_recycle else "NO REC"))
 else:
     current_day = configure_day()
     next_is_recycle = configure_recycle()
