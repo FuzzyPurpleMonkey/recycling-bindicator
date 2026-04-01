@@ -154,6 +154,7 @@ display.clear()
 
 # Track time for day rollover (always reset to now on boot)
 last_day_change = utime.ticks_ms()
+last_shake_ms = utime.ticks_add(utime.ticks_ms(), -10000)  # far in the past
 
 # --- Main loop ---
 while True:
@@ -191,9 +192,11 @@ while True:
         flash_led(YELLOW, 1)
         continue
 
-    # Shake detection
+    # Shake detection (5 second cooldown to suppress phantom shakes from vibration)
     if accelerometer.was_gesture("shake"):
-        handle_shake(next_is_recycle)
+        if utime.ticks_diff(utime.ticks_ms(), last_shake_ms) >= 5000:
+            handle_shake(next_is_recycle)
+            last_shake_ms = utime.ticks_ms()
         continue
 
     # LED behavior based on current day
