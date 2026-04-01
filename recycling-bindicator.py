@@ -87,6 +87,36 @@ def flash_led(pin, times=3):
         sleep(200)
 
 
+STATE_FILE = "state.txt"
+
+
+def save_state(current_day, next_is_recycle):
+    try:
+        with open(STATE_FILE, "w") as f:
+            f.write("d={}\n".format(current_day))
+            f.write("r={}\n".format(1 if next_is_recycle else 0))
+    except:
+        pass
+
+
+def load_state():
+    try:
+        with open(STATE_FILE, "r") as f:
+            lines = f.read().split("\n")
+        d = None
+        r = None
+        for line in lines:
+            if line.startswith("d="):
+                d = int(line[2:])
+            elif line.startswith("r="):
+                r = bool(int(line[2:]))
+        if d is not None and r is not None and 0 <= d <= 6:
+            return (d, r)
+    except:
+        pass
+    return None
+
+
 def handle_shake(next_is_recycle):
     """On shake: green on solid, flash yellow 5x if next is recycle."""
     GREEN.write_digital(1)
@@ -108,12 +138,21 @@ leds_off()
 display.show(Image.HEART)
 sleep(1000)
 
-current_day = configure_day()
-next_is_recycle = configure_recycle()
+# Hold Button A during heart display to force full reconfigure
+force_reconfigure = button_a.is_pressed()
+saved = None if force_reconfigure else load_state()
+
+if saved is not None:
+    current_day, next_is_recycle = saved
+    display.scroll("OK")
+else:
+    current_day = configure_day()
+    next_is_recycle = configure_recycle()
+    save_state(current_day, next_is_recycle)
 
 display.clear()
 
-# Track time for day rollover
+# Track time for day rollover (always reset to now on boot)
 last_day_change = utime.ticks_ms()
 
 # --- Main loop ---
@@ -121,20 +160,35 @@ while True:
     # Day rollover check
     now = utime.ticks_ms()
     elapsed = utime.ticks_diff(now, last_day_change)
-    if elapsed >= 86400000:  # 24 hours in ms
+    day_changed = False
+    while elapsed >= 86400000:  # 24 hours in ms
         last_day_change = utime.ticks_add(last_day_change, 86400000)
+        elapsed -= 86400000
         old_day = current_day
         current_day = (current_day + 1) % 7
         # Toggle recycle flag when rolling past Thursday
         if old_day == THURSDAY:
             next_is_recycle = not next_is_recycle
+        day_changed = True
+    if day_changed:
+        save_state(current_day, next_is_recycle)
 
     # Button presses
     if button_a.was_pressed():
-        flash_led(YELLOW)
+        # Advance day by one (drift correction)
+        old_day = current_day
+        current_day = (current_day + 1) % 7
+        if old_day == THURSDAY:
+            next_is_recycle = not next_is_recycle
+        last_day_change = utime.ticks_ms()
+        save_state(current_day, next_is_recycle)
+        flash_led(GREEN, 1)
         continue
     if button_b.was_pressed():
-        flash_led(GREEN)
+        # Toggle recycle week (phase correction)
+        next_is_recycle = not next_is_recycle
+        save_state(current_day, next_is_recycle)
+        flash_led(YELLOW, 1)
         continue
 
     # Shake detection
